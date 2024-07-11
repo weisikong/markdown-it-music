@@ -103,9 +103,6 @@ const HEADER = `<!DOCTYPE html>
 </script>
 
 <style id="layout">
-  .chart {
-    font-family: "Monaco", "Menlo", "Consolas", monospace;
-  }
 
   .voice {
     display: flex;
@@ -113,6 +110,7 @@ const HEADER = `<!DOCTYPE html>
   }
 
   .line {
+    font-family: "Monaco", "Menlo", "Consolas", monospace;
     display: flex;
     flex-wrap: wrap;
     white-space: pre;
@@ -197,6 +195,10 @@ const LIGHT_THEME = `
     color: white;
   }
 
+  .bar {
+    transform: scale(1.8);
+  }
+
   .c1 {
     color: darkblue;
   }
@@ -210,15 +212,27 @@ const LIGHT_THEME = `
   }
 
   .l2 {
-    color: darkgreen;
+    color: black;
   }
 
   .l3 {
-    color: darkmagenta;
+    color: darkgreen;
   }
 
   .l4 {
+    color: darkmagenta;
+  }
+
+  .l5 {
     color: darkred;
+  }
+
+  .l6 {
+    color: darkslateblue;
+  }
+
+  .l7 {
+    color: darkslategrey;
   }
 
   div.diagram > svg {
@@ -237,6 +251,10 @@ const DARK_THEME = `
     color: #333;
   }
 
+  .bar {
+    transform: scale(1.8);
+  }
+
   .c1 {
     color: #8bacf9;
   }
@@ -250,15 +268,27 @@ const DARK_THEME = `
   }
 
   .l2 {
-    color: #009a2a;
+    color: #fefefe;
   }
 
   .l3 {
-    color: #ff9fb0;
+    color: #009a2a;
   }
 
   .l4 {
+    color: #ff9fb0;
+  }
+
+  .l5 {
     color: #fcdb95;
+  }
+
+  .l6 {
+    color: #1E90FF;
+  }
+    
+  .l7 {
+    color: #778899;
   }
 
   div.vextab > svg {

@@ -1,12 +1,15 @@
-import { convertVerseToEvents } from "../parsers/events.js";
+import { convertVerseToEventsWithOpts } from "../parsers/events.js";
 import { parseVoicing } from "../lib/voicing.js";
 import { guitarChordbook } from "../lib/chordbook.js";
 import { Chord, compareChords } from "../lib/chord.js";
+
+const invisibleRe = /^[_]+$/
 
 export class ChordsRenderer {
   constructor(opts) {
     this.voiceOrder = [];
     this.transposeAmount = 0;
+    this.transposeSharpFlatPref = '#';
     this.currentPhraseIndex = 0;
     this.chordIndex = 0;
     this.chordsUsed = [];
@@ -17,7 +20,8 @@ export class ChordsRenderer {
   setOptions(opts) {
     if (!opts) return;
 
-    this.transposeAmount = opts.transpose || 0;
+    this.transposeAmount = +opts.transpose.replace(/[^0-9-]/g, '') || 0;
+    this.transposeSharpFlatPref = opts.transpose.replace(/[0-9-]/g, '');
 
     if (opts.chords) {
       Object.entries(opts.chords).forEach(([chord, shorthands]) => {
@@ -38,29 +42,31 @@ export class ChordsRenderer {
     return false;
   }
 
-  createEventHTMLChordChart(lines) {
-    let chartDiv = `<div class="chart">`;
+  createEventHTMLChordChart(lines, instruments, width) {
+    let chartDiv = '';
 
     lines.forEach((line) => {
       // create line div for each event
-      chartDiv += this.createLineDiv(line);
+      chartDiv += this.createLineDiv(line, instruments, width);
       this.currentPhraseIndex++;
     });
 
-    return chartDiv + "</div>";
+    return chartDiv;
   }
 
-  createLineDiv(line) {
-    let lineDiv = `<div class="line">`;
+  createLineDiv(line, instruments, width) {
+    let lineDiv = `<div class="line" style="scroll-snap-stop: always; scroll-snap-align: start; width: `;
+    lineDiv += width
+    lineDiv += `px">`
 
     line.forEach((event) => {
-      lineDiv += this.createEventDiv(event);
+      lineDiv += this.createEventDiv(event, instruments);
     });
 
     return lineDiv + "</div>";
   }
 
-  createEventDiv(event) {
+  createEventDiv(event, instruments) {
     let eventDiv = `<div class="event">`;
 
     const currentVoiceOrder = this.voiceOrder[this.currentPhraseIndex];
@@ -72,41 +78,68 @@ export class ChordsRenderer {
     }
 
     currentVoiceOrder.forEach((voice) => {
-      if (event[0] && voice === event[0].voice) {
-        eventDiv += this.createVoiceDiv(event.shift());
-      } else {
-        const emptyDiv = "<div> </div>";
-        eventDiv += emptyDiv;
+      if (instruments.has(voice) || voice === "c" || voice === "c1") {
+        if (event[0] && voice === event[0].voice) {
+          eventDiv += this.createVoiceDiv(event.shift());
+        } else {
+          const emptyDiv = "<div> </div>";
+          eventDiv += emptyDiv;
+        }
       }
     });
     return eventDiv + `</div>`;
   }
 
+  shouldBeInvisile(content) {
+    return ((content || '').match(invisibleRe) || []).length === 1;
+  }
+
+  isContentBarLine(voice) {
+    if (voice.content instanceof Chord) {
+      return false;
+    }
+    return voice.content.toString() === '|';
+  }
+
   createContentSpan(voice) {
     const content = voice.content.toString();
     if (voice.content instanceof Chord) {
-      if (guitarChordbook.has(content)) {
-        if (!this.isChordUsed(voice.content)) {
-          this.chordsUsed.push(voice.content);
-        }
-        const id = `${this.chordIndex++}`;
-        const attrValue = voice.content.toAttributeValue();
-        return (
-          `<span id="chord-${id}" class="chord"` +
-          ` onmouseover="showTooltip('chord-${id}', '${attrValue}')"` +
-          ` onmouseout="hideTooltip('${attrValue}')"` +
-          `>${content}</span>`
-        );
-      } else {
-        return `<span class="chord highlight">${content}</span>`;
-      }
+      // no need
+      // if (guitarChordbook.has(content)) {
+      //   if (!this.isChordUsed(voice.content)) {
+      //     this.chordsUsed.push(voice.content);
+      //   }
+      //   const id = `${this.chordIndex++}`;
+      //   const attrValue = voice.content.toAttributeValue();
+      //   return (
+      //     `<span id="chord-${id}" class="chord"` +
+      //     ` onmouseover="showTooltip('chord-${id}', '${attrValue}')"` +
+      //     ` onmouseout="hideTooltip('${attrValue}')"` +
+      //     `>${content}</span>`
+      //   );
+      // } else {
+      //   return `<span class="chord highlight">${content}</span>`;
+      // }
+      return `<span class="chord">${content}</span>`;
+    }
+    if (this.shouldBeInvisile(content)) {
+      return " ".repeat(content.length);
     }
     return content;
   }
 
   createVoiceDiv(voice) {
     if (voice.content instanceof Chord) {
-      voice.content = voice.content.transpose(this.transposeAmount);
+      voice.content = voice.content.transpose(this.transposeAmount, this.transposeSharpFlatPref);
+    }
+
+    if (this.isContentBarLine(voice)) {
+      return (
+        `<div class="${voice.voice} bar">` +
+        " ".repeat(voice.offset) +
+        this.createContentSpan(voice) +
+        `</div>`
+      );
     }
 
     return (
@@ -123,8 +156,8 @@ export class ChordsRenderer {
     this.voiceOrder = verse.map((phrase) => Array.from(phrase.keys()));
     this.currentPhraseIndex = 0;
 
-    const lines = convertVerseToEvents(verse);
+    const lines = convertVerseToEventsWithOpts(verse, opts);
 
-    return this.createEventHTMLChordChart(lines);
+    return this.createEventHTMLChordChart(lines, opts.instrumentsConfig.instrumentsToRender, opts.maxWidth);
   }
 }

@@ -59,16 +59,18 @@ export class Line {
    * @param {Map<String, Object[]>} phrase The phrase to pick events from.
    * @param {Object} longestEvent The longest (by content length) and first voice event from phrase.
    * @param {number} startIndex The index for the start of this event.
+   * @param {Set<string>} instruments Only renders necessary instruments.
    * @return {String[]} voiceAdded Voice names added to event list.
    * @return {Object[]} line List of the first of each voice from phrase that fit within bounds of longest event.
    */
-  addEvents(phrase, longestEvent, startIndex) {
+  addEvents(phrase, longestEvent, startIndex, instruments) {
     const line = [];
     const voicesAdded = [];
     const longestEventMinIndex = longestEvent.index;
     const longestEventMaxIndex =
       longestEventMinIndex + longestEvent.content.toString().length;
 
+    var rollback = false;
     phrase.forEach((events, voiceName) => {
       if (events.length === 0) {
         return;
@@ -91,15 +93,24 @@ export class Line {
         const eventToAdd = events.shift();
 
         eventToAdd.voice = voiceName;
-        eventToAdd.offset =
-          this.spacesBetweenEvents + eventToAdd.index - startIndex;
-
-        line.push(eventToAdd);
-        voicesAdded.push(voiceName);
+        if (eventToAdd.content == '|') {
+          rollback = true;
+          this.spacesBetweenEvents = 0;
+        }
+        eventToAdd.offset = this.spacesBetweenEvents + eventToAdd.index - startIndex;
+        if (instruments.has(voiceName) || voiceName === "c" || voiceName === "c1") {
+          line.push(eventToAdd);
+          voicesAdded.push(voiceName);
+        }
       }
     });
 
-    this.spacesBetweenEvents = 1;
+    if (rollback) {
+      rollback = false;
+      this.spacesBetweenEvents = 0;
+    } else {
+      this.spacesBetweenEvents = 1;
+    }
 
     return { voicesAdded, line };
   }
@@ -109,9 +120,10 @@ export class Line {
    *
    * @param {Map<String, Object[]>} phrase Map of voice names to voice object stack.
    * @param {String[]} voiceOrder Sort order for voices.
+   * @param {Set<string>} instruments Only renders necessary instruments.
    * @return {Object[]} List of event lists sorted (by voiceOrder).
    */
-  createLineFromPhrase(phrase, voiceOrder) {
+  createLineFromPhrase(phrase, voiceOrder, instruments) {
     const firstEventOfEachVoice = Array.from(phrase.values()).map(
       (voiceArr) => voiceArr[0],
     );
@@ -145,6 +157,7 @@ export class Line {
       phrase,
       longestEvent,
       eventIndex,
+      instruments,
     );
 
     this.previousLine = line
@@ -158,17 +171,23 @@ export class Line {
   }
 }
 
-function convertPhraseToEvents(phrase) {
+function convertPhraseToEvents(phrase, opts) {
   const voiceOrder = Array.from(phrase.keys());
   const events = [];
 
   // create events for this phrase until there are no events left to process.
   const line = new Line();
   while (!Array.from(phrase.values()).every((arr) => arr.length === 0)) {
-    events.push(line.createLineFromPhrase(phrase, voiceOrder));
+    events.push(line.createLineFromPhrase(phrase, voiceOrder, opts.instrumentsConfig.instrumentsToRender));
   }
 
   return events;
+}
+
+function convertVerseToEventsWithOpts(verse, opts) {
+  return verse.map((phrase) => {
+    return convertPhraseToEvents(phrase, opts);
+  });
 }
 
 /**
@@ -177,8 +196,13 @@ function convertPhraseToEvents(phrase) {
  * @param {Object} verse The verse that contains phrases to be translated to events.
  * @return {Line[]} List of Line that represent a verse. Each phrase is represented by a single Line.
  */
-export function convertVerseToEvents(verse) {
+function convertVerseToEvents(verse) {
   return verse.map((phrase) => {
     return convertPhraseToEvents(phrase);
   });
 }
+
+module.exports = {
+  convertVerseToEvents,
+  convertVerseToEventsWithOpts,
+};
