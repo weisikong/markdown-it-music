@@ -5,7 +5,7 @@
  *
  * See tests for example input/output structure.
  */
-export class Line {
+class Line {
   constructor() {
     this.spacesBetweenEvents = 0;
     this.previousLine = [];
@@ -203,6 +203,7 @@ function convertVerseToEvents(verse) {
 }
 
 module.exports = {
+  Line,
   convertVerseToEvents,
   convertVerseToEventsWithOpts,
 };
